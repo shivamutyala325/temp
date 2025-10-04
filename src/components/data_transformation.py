@@ -3,81 +3,117 @@ import os
 import sys
 from src.logger import logging
 from src.exception import CustomException
-from sklearn.compose import ColumnTransformer
+from sklearn.compose import ColumnTransformer, _column_transformer
 from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
 from src.components.data_injestion import DataInjestion
-
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
+from src.utils import save_object
 
 logger = logging.getLogger('data_transformation')
-transformed_path = 'transformed_data'  
+ 
 
 class DataTransform:
     
     def __init__(self):
+        self.column_processor_obj_path=os.path.join('artifacts','column_processor.pkl')
         
-        self.output_dir = os.path.join('artifacts', transformed_path)
-        os.makedirs(self.output_dir, exist_ok=True)
-
-        self.transformed_train_path = os.path.join(self.output_dir, 'transformed_train.csv')
-        self.transformed_test_path = os.path.join(self.output_dir, 'transformed_test.csv')
         
         ingestion = DataInjestion()
         self.train_data_path, self.test_data_path = ingestion.initiate_data_ingestion()
         
 
-    def transform_data(self):
+    def get_transformer_object(self):
         try:
-            logger.info('Transformation initiated')
-            self.test_data = pd.read_csv(self.test_data_path)
-            self.train_data = pd.read_csv(self.train_data_path)
-            logger.info('Data read successfully from artifacts')
 
             
-            self.ordinal_features = ['parental level of education','lunch','test preparation course']
-            self.nominal_features = ['gender','race/ethnicity']
-            self.numerical_features = ['reading score','writing score']
+            ordinal_features = ['parental level of education','lunch','test preparation course']
+            nominal_features = ['gender','race/ethnicity']
+            numerical_features = ['reading score','writing score']
+            
 
-            self.order_of_ordinals = [
+
+            order_of_ordinals = [
                 ["some high school","high school","some college","bachelor's degree","associate's degree","master's degree"],
                 ['free/reduced','standard'],
                 ['none','completed']
             ]
 
+            ordinal_pipeline=Pipeline(
+                steps=[
+                    ("imputer",SimpleImputer(strategy='most_frequent')),
+                    ("ordinal_encoding",OrdinalEncoder(categories=order_of_ordinals))
+                ]
+            )
+
+            nominal_pipeline=Pipeline(
+                steps=[
+                    ("imputer",SimpleImputer(strategy='most_frequent')),
+                    ("onehot_encoding",OneHotEncoder())
+
+                ]
+            )
+
+            numerical_pipeline=Pipeline(
+                steps=[
+                    ("imputer",SimpleImputer(strategy='mean')),
+                    ("scaler",StandardScaler())
+                ]
+            )
             
             logger.info('Column transformer creation started')
-            self.transformer = ColumnTransformer(
-                transformers=[
-                    ("ord", OrdinalEncoder(categories=self.order_of_ordinals), self.ordinal_features),
-                    ("nom", OneHotEncoder(), self.nominal_features),
-                    ("num", StandardScaler(), self.numerical_features)
-                ],
-                remainder='drop'
+            
+            column_transformer=ColumnTransformer(
+                [("ord_transform",ordinal_pipeline,ordinal_features),
+                ("nom_transform",nominal_pipeline,nominal_features),
+                ("num_transform",numerical_pipeline,numerical_features)],
+                remainder='passthrough',
+                verbose_feature_names_out=False
             )
 
+
+            return column_transformer
+                
+                
             
-            self.transformed_train_data = self.transformer.fit_transform(self.train_data)
-            self.transformed_test_data = self.transformer.transform(self.test_data)
-
-            
-            feature_names = self.transformer.get_feature_names_out()
-
-            # Save with proper column names
-            pd.DataFrame(self.transformed_train_data, columns=feature_names).to_csv(self.transformed_train_path, index=False)
-            pd.DataFrame(self.transformed_test_data, columns=feature_names).to_csv(self.transformed_test_path, index=False)
-
-            logger.info('Saved transformed data into files')
-
-            return (
-                self.transformed_train_path,
-                self.transformed_test_path
-            )
 
         except Exception as e:
             logger.error(e)
             raise CustomException(str(e), sys)
 
 
-# Run directly
+    def transform_data(self,train_path,test_path):
+        try:
+
+            column_transformer=self.get_transformer_object()
+            logger.info('obtained the column_transormer object')
+            train_data=pd.read_csv(train_path)
+            test_data=pd.read_csv(test_path)
+
+            logger.info('colum transformation begins')
+            transformed_train_data=column_transformer.fit_transform(train_data)
+            transformed_test_data=column_transformer.transform(test_data)
+
+            save_object(file_path=self.column_processor_obj_path,
+                    obj=column_transformer
+
+            )
+            logger.info('saved the transformer object to pkl file')
+            return (
+                transformed_train_data,
+                transformed_test_data
+            )
+
+
+
+
+        except Exception as e:
+            raise CustomException(e,sys)
+
+
+
+
+
 if __name__ == "__main__":
     t = DataTransform()
-    print(t.transform_data())
+    print(t.transform_data(r'artifacts\train_data.csv',r'artifacts\test_data.csv'))
