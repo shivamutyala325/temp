@@ -5,6 +5,7 @@ from src.exception import CustomException
 from src.logger import logging
 from sklearn.model_selection import train_test_split
 
+
 logger=logging.getLogger('data_injestion')
 
 artifact_dir='artifacts'
@@ -13,8 +14,8 @@ artifact_dir='artifacts'
 class DataInjestion:
     def __init__(self):
         self.raw_data_path=os.path.join(artifact_dir,'raw_data.csv')
-        self.train_data_path=os.path.join(artifact_dir,'train_data_dir.csv')
-        self.test_dir_path=os.path.join(artifact_dir,'test_data_dir.csv')
+        self.train_data_path=os.path.join(artifact_dir,'train_data.csv')
+        self.test_dir_path=os.path.join(artifact_dir,'test_data.csv')
 
 
     def initiate_data_ingestion(self): 
@@ -41,7 +42,3 @@ class DataInjestion:
         except Exception as e:
             logging.error(e)
             raise CustomException(str(e),sys)
-
-
-d=DataInjestion()
-d.initiate_data_ingestion()
