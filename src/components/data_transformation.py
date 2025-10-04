@@ -49,7 +49,7 @@ class DataTransform:
             nominal_pipeline=Pipeline(
                 steps=[
                     ("imputer",SimpleImputer(strategy='most_frequent')),
-                    ("onehot_encoding",OneHotEncoder())
+                    ("onehot_encoding",OneHotEncoder(handle_unknown='ignore', sparse_output=False))
 
                 ]
             )
@@ -90,9 +90,14 @@ class DataTransform:
             train_data=pd.read_csv(train_path)
             test_data=pd.read_csv(test_path)
 
+            x_train=train_data.drop('math score',axis=1)
+            y_train=train_data['math score']
+            x_test=test_data.drop('math score',axis=1)
+            y_test=test_data['math score']
+
             logger.info('colum transformation begins')
-            transformed_train_data=column_transformer.fit_transform(train_data)
-            transformed_test_data=column_transformer.transform(test_data)
+            transformed_x_train=column_transformer.fit_transform(x_train)
+            transformed_x_test=column_transformer.transform(x_test)
 
             save_object(file_path=self.column_processor_obj_path,
                     obj=column_transformer
@@ -100,8 +105,11 @@ class DataTransform:
             )
             logger.info('saved the transformer object to pkl file')
             return (
-                transformed_train_data,
-                transformed_test_data
+                transformed_x_train,
+                y_train,
+                transformed_x_test,
+                y_test
+
             )
 
 
@@ -116,4 +124,9 @@ class DataTransform:
 
 if __name__ == "__main__":
     t = DataTransform()
-    print(t.transform_data(r'artifacts\train_data.csv',r'artifacts\test_data.csv'))
+    a,b,c,d=t.transform_data(r'artifacts\train_data.csv',r'artifacts\test_data.csv')
+    print(a.shape)
+    print(b.shape)
+    print(c.shape)
+    print(d.shape)
+

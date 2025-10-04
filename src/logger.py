@@ -17,6 +17,3 @@ logging.basicConfig(
     
                     )
 
-
-def get_logger(filename):
-    return logging.getLogger(filename)
